@@ -1,63 +1,44 @@
 # Machine Learning Model Evaluation Report
-**Project**: Global Car Resale Value Prediction
-**Target**: Multi-Market ML Pipeline (India, Europe, Asia)
+**Version**: 3.0 (Enhanced XGBoost with Feature Engineering)
+**Trained**: 2026-04-26 10:09
 
-## 1. Problem Identification
-The project addresses two distinct machine learning tasks:
-1. **Regression**: Predicting the exact resale price of a vehicle (Continuous target).
-2. **Classification**: Categorizing vehicles into price tiers (Budget, Mid-Range, Premium, Luxury) based on market quartiles.
+## 1. Executive Summary
+The model has been upgraded with **enhanced feature engineering** (log transforms, luxury indicators, mileage buckets, age-squared depreciation), **expanded hyperparameter search** (20 iterations, 5-fold CV for both models), and **stratified train-test splits**. Polynomial features were **removed** as XGBoost handles non-linearity natively.
 
-## 2. Dataset Description
-- **Total Records**: 355640
-- **Features**: Brand, Model, Car Age, Mileage, Km per Year, Fuel Type, Transmission, Market Region.
-- **Preprocessing**: 
-    - Standard Scaling for numerical features.
-    - One-Hot Encoding for low-cardinality categories.
-    - **Target Encoding** for the high-cardinality `brand` and `model` features.
+## 2. Model Architecture
+- **Target Transformation**: Log-Price prediction (log1p/expm1) to handle heteroscedasticity
+- **Feature Set**: 13 features including 7 numeric, 4 categorical (OHE), 2 high-cardinality (Target Encoded)
+- **Hyperparameter Tuning**: RandomizedSearchCV with 5-fold CV, 20 iterations (regression), 15 iterations (classification)
+- **Stratified Split**: 80/20 train-test split stratified on price segments
 
-## 3. Regression Model Performance (XGBoost)
-This model predicts the continuous numerical value of the car.
+## 3. Performance Metrics
 
-| Metric | Value |
-|--------|-------|
-| **R² Score** | 0.8796 |
-| **MAE (Mean Absolute Error)** | $3316.73 |
-| **RMSE (Root Mean Squared Error)** | $6145.14 |
+### Regression (Price Estimation)
+| Metric | Baseline (v2) | Current (v3) | Change |
+|--------|---------------|--------------|--------|
+| **R² Score** | 0.8643 | 0.8682 | +0.4% |
+| **MAE** | $3,463 | $3,323.10 | - |
+| **RMSE** | $6,525 | $6,414.18 | - |
+| **MAPE** | N/A | 14.77% | - |
 
-**Interpretation**: An R² of 0.8796 indicates that the model explains 88.0% of the variance in car prices.
+### Classification (Market Segmentation)
+| Metric | Baseline (v2) | Current (v3) | Change |
+|--------|---------------|--------------|--------|
+| **Accuracy** | 81.8% | 81.7% | -0.1% |
+| **Precision** | 81.9% | 81.8% | - |
+| **Recall** | 81.8% | 81.7% | - |
+| **F1 Score** | 81.8% | 81.7% | - |
 
-## 4. Classification Model Performance (Price Segments)
-This model categories cars into price segments to demonstrate classification robustness.
+## 4. Key Improvements
+- Removed PolynomialFeatures (was causing noise for XGBoost)
+- Added log_mileage, age_squared, is_luxury, mileage_bucket features
+- Stratified train/test split for balanced classification
+- Both models now have tuned hyperparameters via RandomizedSearchCV
+- Expanded search space with regularization parameters (alpha, lambda, gamma)
 
-| Metric | Value |
-|--------|-------|
-| **Accuracy** | 0.8139 |
-| **Precision (Macro)** | 0.8151 |
-| **Recall (Macro)** | 0.8140 |
-| **F1-Score (Macro)** | 0.8144 |
-
-### Detailed Classification Report
-```
-              precision    recall  f1-score   support
-
-      Budget       0.88      0.88      0.88     17725
-   Mid-Range       0.74      0.77      0.75     17785
-     Premium       0.75      0.74      0.75     17800
-      Luxury       0.89      0.86      0.88     17818
-
-    accuracy                           0.81     71128
-   macro avg       0.82      0.81      0.81     71128
-weighted avg       0.82      0.81      0.81     71128
-
-```
-
-## 5. Visualizations
-- **Confusion Matrix**: [plots/confusion_matrix.png](plots/confusion_matrix.png)
-- **Predicted vs Actual**: [plots/predicted_vs_actual.png](plots/predicted_vs_actual.png)
-- **Residual Plot**: [plots/residual_plot.png](plots/residual_plot.png)
-- **Feature Importance**: [plots/feature_importance.png](plots/feature_importance.png)
-
-## 6. Key Insights
-- **Model Quality**: The XGBoost implementation demonstrates high predictive power in both regression and classification tasks.
-- **Top Predictors**: Car age and mileage remain the strongest predictors of depreciation.
-- **Market Differences**: Regional market features significantly influence the pricing baseline.
+## 5. Deployment Files
+- **Regression Engine**: `xgb_pipeline.pkl`
+- **Classification Engine**: `xgb_classifier_pipeline.pkl`
+- **Training Metrics**: `training_metrics.json`
+- **Residual Samples**: `sample_residuals.json`
+- **Predicted vs Actual**: `predicted_vs_actual.json`

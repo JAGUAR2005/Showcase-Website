@@ -63,5 +63,15 @@ npm run dev
 ## 📝 Note for Recruiters
 This repository showcases a full-stack Machine Learning production lifecycle—from raw data cleaning and hyper-parameter tuning to a responsive, deployment-ready user interface. The frontend is hosted on **GitHub Pages** in Preview Mode, while the core API is designed for localized high-performance inference.
 
+## 🛠️ Support & Licensing
+
+### Support Policy
+For technical inquiries, bug reports, or feature requests regarding the Car Resale Intelligence platform, please open an issue in the GitHub repository. Response time is typically within 48 hours for critical issues.
+
+### Licensing
+- **Code**: All original source code is licensed under the **MIT License**.
+- **Design & Assets**: Custom UI components and design tokens are proprietary. Placeholder assets (e.g., hero backgrounds) are sourced from open-license repositories (Unsplash/Pexels) and are intended for demonstration purposes only.
+- **Data**: Training datasets are synthesized from public automotive market records and are used under Fair Use for educational and research purposes.
+
 ---
 © 2026 Resale Intelligence Systems. Powered by XGBoost Gradient Boosting.

@@ -1,55 +1,60 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import { AnimatePresence, motion } from 'framer-motion';
+import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area
 } from 'recharts';
-import { 
-  Activity, ShieldCheck, Sparkles, Zap, Database
+import {
+  Activity, ShieldCheck
 } from 'lucide-react';
 import './App.css';
 
+// Components
+import NeuralHeatmap from './components/NeuralHeatmap';
+import ErrorStability from './components/ErrorStability';
+import FeatureHierarchy from './components/FeatureHierarchy';
+import SectionTag from './components/UI/SectionTag';
+import RevealSection from './components/UI/RevealSection';
+import AnimatedCounter from './components/UI/AnimatedCounter';
+import AnimatedTitle from './components/UI/AnimatedTitle';
+import Logo from './components/UI/Logo';
+
+/* ─── Fallback Registry ─── */
 const FALLBACK_REGISTRY: any = {
   india: {
-    maruti: ['alto', 'swift', 'baleno', 'brezza'],
-    hyundai: ['i10', 'i20', 'creta', 'verna'],
-    tata: ['nexon', 'tiago', 'harrier']
+    maruti: ["800", "alto", "baleno", "brezza", "swift", "wagon"],
+    tata: ["altroz", "harrier", "nexon", "punch", "tiago"],
+    hyundai: ["creta", "i10", "i20", "verna", "venue"]
   },
   europe: {
-    vw: ['golf', 'polo', 'passat'],
-    bmw: ['3-series', '5-series', 'x3'],
-    mercedes: ['c-class', 'e-class', 'glc']
-  },
-  asia_uk: {
-    toyota: ['yaris', 'corolla', 'rav4'],
-    ford: ['fiesta', 'focus', 'kuga'],
-    vauxhall: ['corsa', 'astra', 'mokka']
+    audi: ["a3", "a4", "a6", "q3", "q5"],
+    bmw: ["3 series", "5 series", "x3", "x5"],
+    vw: ["golf", "polo", "tiguan", "passat"]
   }
 };
 
+/* ═══════════════════════════════════════ */
+/*              MAIN APP                  */
+/* ═══════════════════════════════════════ */
 function App() {
   const [market, setMarket] = useState<string>('india');
   const [registry, setRegistry] = useState<any>(FALLBACK_REGISTRY);
   const [formData, setFormData] = useState({
-    market: 'india',
-    brand: 'maruti',
-    model: 'alto',
-    year: 2018,
-    mileage: 50000,
-    fuel_type: 'petrol',
-    transmission: 'manual',
-    target_currency: 'USD'
+    market: 'india', brand: 'maruti', model: 'alto',
+    year: 2018, mileage: 50000, fuel_type: 'petrol',
+    transmission: 'manual', target_currency: 'AUTO'
   });
-  
-  const [result, setResult] = useState<{price: number, segment: string, symbol: string} | null>(null);
+  const [result, setResult] = useState<{ price: number; segment: string; symbol: string } | null>(null);
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [configLoading, setConfigLoading] = useState(true);
+  const [, setConfigLoading] = useState(true);
 
-  useEffect(() => {
-    fetchConfig();
-    fetchMetrics();
+  useEffect(() => { 
+    fetchConfig(); 
+    fetchMetrics(); 
+    const interval = setInterval(fetchMetrics, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchConfig = async () => {
@@ -58,371 +63,354 @@ function App() {
       const res = await axios.get('http://localhost:8000/config');
       if (res.data && Object.keys(res.data).length > 0) {
         setRegistry(res.data);
-        const defaultMarket = Object.keys(res.data)[0];
-        const defaultBrand = Object.keys(res.data[defaultMarket])[0];
-        const defaultModel = res.data[defaultMarket][defaultBrand][0];
-        
-        setMarket(defaultMarket);
-        setFormData(prev => ({ 
-          ...prev, 
-          market: defaultMarket, 
-          brand: defaultBrand, 
-          model: defaultModel 
-        }));
+        const dm = Object.keys(res.data)[0];
+        const db = Object.keys(res.data[dm])[0];
+        const dmod = res.data[dm][db][0];
+        setMarket(dm);
+        setFormData(prev => ({ ...prev, market: dm, brand: db, model: dmod }));
       }
-    } catch (err) {
-      console.log("Operating in Preview Mode. Backend API is localized.");
-    } finally {
-      setConfigLoading(false);
-    }
+    } catch { console.log("Operating in Preview Mode."); }
+    finally { setConfigLoading(false); }
   };
 
   const fetchMetrics = async () => {
-    try {
-      const res = await axios.get('http://localhost:8000/metrics');
-      setMetrics(res.data);
-    } catch (err) {
-      // Metrics use fallback values in charts
-    }
+    try { const res = await axios.get('http://localhost:8000/metrics'); setMetrics(res.data); }
+    catch { }
   };
 
-  const handleMarketChange = (newMarket: string) => {
-    setMarket(newMarket);
-    const brands = Object.keys(registry[newMarket]);
-    const defaultBrand = brands[0];
-    const defaultModel = registry[newMarket][defaultBrand][0];
-    setFormData({ ...formData, market: newMarket, brand: defaultBrand, model: defaultModel });
+  const handleMarketChange = (m: string) => {
+    setMarket(m);
+    const b = Object.keys(registry[m])[0];
+    setFormData({ ...formData, market: m, brand: b, model: registry[m][b][0] });
     setResult(null);
   };
 
-  const handleBrandChange = (newBrand: string) => {
-    const defaultModel = registry[market][newBrand][0];
-    setFormData({ ...formData, brand: newBrand, model: defaultModel });
+  const handleBrandChange = (b: string) => {
+    setFormData({ ...formData, brand: b, model: (registry[market][b] || [])[0] || '' });
   };
 
   const handlePredict = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:8000/predict', formData);
-      setResult({
-        price: response.data.predicted_price,
-        segment: response.data.segment,
-        symbol: response.data.symbol
-      });
-    } catch (err) {
-      console.error('Prediction engine failed to respond.');
-    } finally {
-      setLoading(false);
-    }
+      const r = await axios.post('http://localhost:8000/predict', formData);
+      setResult({ price: r.data.predicted_price, segment: r.data.segment, symbol: r.data.symbol });
+    } catch { console.error('Prediction engine offline.'); }
+    finally { setLoading(false); }
   };
 
-  const handleCurrencyChange = (curr: string) => {
-    setFormData(prev => ({ ...prev, target_currency: curr }));
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
-
-  useEffect(() => {
-    if (result || loading) {
-      handlePredict();
-    }
-  }, [formData.target_currency]);
 
   const chartData = [
-    { name: 'Predictive Accuracy', value: metrics?.regression?.r2 * 100 || 88.0 },
-    { name: 'Market Precision', value: metrics?.classification?.accuracy * 100 || 81.4 },
-    { name: 'Model Recall', value: metrics?.classification?.recall * 100 || 81.4 },
-    { name: 'Validation F1', value: metrics?.classification?.precision * 100 || 81.5 },
+    { name: 'R² Score', value: metrics?.regression?.r2 * 100 || 86.82 },
+    { name: 'Accuracy', value: metrics?.classification?.accuracy * 100 || 81.7 },
+    { name: 'Precision', value: metrics?.classification?.precision * 100 || 81.8 },
+    { name: 'Recall', value: metrics?.classification?.recall * 100 || 81.7 },
+    { name: 'F1 Score', value: metrics?.classification?.f1 * 100 || 81.7 },
   ];
 
   return (
-    <main className="app-container">
-      <header>
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}
-        >
-          <span className="badge">Neural Engine V3.0</span>
-          <span className="badge" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}>
-            {configLoading || !metrics ? 'Preview Mode' : 'Live API Connected'}
-          </span>
-        </motion.div>
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          Resale <span className="luxury-gradient">Intelligence</span>
-        </motion.h1>
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          Unlock hyper-accurate automotive valuations powered by advanced XGBoost gradient boosting and global market data mapping.
-        </motion.p>
-      </header>
+    <>
+      {/* ─── SITE FRAME ─── */}
+      <div className="site-frame">
+        <main>
+          {/* ═══ HERO ═══ */}
+          <section className="hero-section" id="hero">
+            <div className="hero-bg">
+              <div className="hero-bg-img" role="img" aria-label="Abstract neural network background" />
+              <div className="hero-bg-gradient" />
+            </div>
 
-      <nav className="market-nav" aria-label="Market selection">
-        {registry && Object.keys(registry).map((m) => (
-          <button 
-            key={m}
-            className={`nav-item ${market === m ? 'active' : ''}`}
-            onClick={() => handleMarketChange(m)}
-          >
-            {m.replace('_', ' ').toUpperCase()}
-          </button>
-        ))}
-      </nav>
-
-      <div className="dashboard-grid">
-        {/* Prediction Sidebar */}
-        <motion.section 
-          className="col-sidebar glass-card"
-          initial={{ opacity: 0, x: -30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2.5rem' }}>
-            <Zap size={24} className="luxury-gradient" />
-            <h2 style={{ fontSize: '1.4rem' }}>Parameters</h2>
-          </div>
-
-          <form onSubmit={handlePredict}>
-            <div className="input-group">
-              <label htmlFor="brand">Manufacturer</label>
-              <select 
-                id="brand"
-                className="modern-input"
-                value={formData.brand}
-                onChange={e => handleBrandChange(e.target.value)}
+            <div className="hero-main">
+              <motion.span
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="hero-tag"
               >
-                {registry && registry[market] && Object.keys(registry[market]).map(b => (
-                  <option key={b} value={b}>{b.charAt(0).toUpperCase() + b.slice(1)}</option>
-                ))}
-              </select>
-            </div>
+                system.26 // neural engine active
+              </motion.span>
 
-            <div className="input-group">
-              <label htmlFor="model">Vehicle Model</label>
-              <select 
-                id="model"
-                className="modern-input"
-                value={formData.model}
-                onChange={e => setFormData({...formData, model: e.target.value})}
+              <h1 className="hero-title">
+                <AnimatedTitle text="RESALE" delay={0.4} />
+                <br />
+                <AnimatedTitle text="INTELLIGENCE" className="blue-highlight" delay={0.8} />
+              </h1>
+
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 1.4 }}
+                className="hero-desc"
               >
-                {registry && registry[market] && registry[market][formData.brand]?.map((m: string) => (
-                  <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
-                ))}
-              </select>
+                Automotive valuation through fractured data analysis. Predictive XGBoost modeling mapped to global market volatility.
+              </motion.p>
             </div>
 
-            <div className="input-group">
-              <label htmlFor="year">Production Year</label>
-              <input 
-                id="year"
-                type="number" 
-                className="modern-input"
-                min="2000"
-                max="2024"
-                value={formData.year}
-                onChange={e => setFormData({...formData, year: Number(e.target.value)})}
-              />
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="mileage">Odometer (km)</label>
-              <input 
-                id="mileage"
-                type="number" 
-                className="modern-input"
-                value={formData.mileage}
-                onChange={e => setFormData({...formData, mileage: Number(e.target.value)})}
-              />
-            </div>
-
-            <div className="input-group">
-              <label>Configuration</label>
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <select 
-                  aria-label="Fuel type"
-                  className="modern-input"
-                  value={formData.fuel_type}
-                  onChange={e => setFormData({...formData, fuel_type: e.target.value})}
-                >
-                  <option value="petrol">Petrol</option>
-                  <option value="diesel">Diesel</option>
-                  <option value="electric">Electric</option>
-                </select>
-                <select 
-                  aria-label="Transmission"
-                  className="modern-input"
-                  value={formData.transmission}
-                  onChange={e => setFormData({...formData, transmission: e.target.value})}
-                >
-                  <option value="manual">Manual</option>
-                  <option value="automatic">Auto</option>
-                </select>
+            <div className="status-ticker">
+              <div className="ticker-inner">
+                <div className="ticker-item">
+                  <div className="ticker-value">
+                    <AnimatedCounter value={metrics?.regression?.r2 * 100 || 86.82} suffix="%" />
+                  </div>
+                  <div className="ticker-label">R² Score</div>
+                </div>
+                <div className="ticker-divider" />
+                <div className="ticker-item">
+                  <div className="ticker-value">{metrics?.dataset?.records ? `${Math.round(metrics.dataset.records / 1000)}K+` : '355K+'}</div>
+                  <div className="ticker-label">Records Trained</div>
+                </div>
+                <div className="ticker-divider" />
+                <div className="ticker-item">
+                  <div className="ticker-value blue">XGB</div>
+                  <div className="ticker-label">Engine: Online</div>
+                </div>
               </div>
             </div>
+          </section>
 
-            <button className="predict-btn" type="submit" disabled={loading || !registry}>
-              {loading ? 'Analyzing Data...' : 'Calculate Valuation'}
-            </button>
-          </form>
-        </motion.section>
+          {/* ═══ FORM SECTION ═══ */}
+          <RevealSection className="form-section" id="variables">
+            <SectionTag label="variables" />
+            <div className="form-section-inner">
+              <div className="form-header">
+                <span className="form-indicator" />
+                <h3>Input Parameters</h3>
+              </div>
 
-        {/* Results & Visualization Main */}
-        <div className="col-main">
-          <nav className="currency-selector" aria-label="Currency selection">
-            {['USD', 'EUR', 'INR', 'GBP'].map(curr => (
-              <button 
-                key={curr}
-                className={`curr-btn ${formData.target_currency === curr ? 'active' : ''}`}
-                onClick={() => handleCurrencyChange(curr)}
-              >
-                {curr}
-              </button>
-            ))}
-          </nav>
+              <form onSubmit={handlePredict}>
+                <div className="form-grid">
+                  <div className="input-field-group span-2">
+                    <label className="field-label">Market Region</label>
+                    <nav className="market-nav" aria-label="Market selection">
+                      {registry && Object.keys(registry).map((m) => (
+                        <button
+                          key={m} type="button"
+                          className={`market-btn ${market === m ? 'active' : ''}`}
+                          onClick={() => handleMarketChange(m)}
+                          aria-pressed={market === m}
+                        >
+                          {m.replace('_', ' ')}
+                        </button>
+                      ))}
+                    </nav>
+                  </div>
 
+                  <div className="input-field-group">
+                    <label className="field-label" htmlFor="brand-select">Manufacturer</label>
+                    <select id="brand-select" className="brand-select" value={formData.brand}
+                      onChange={e => handleBrandChange(e.target.value)}>
+                      {registry?.[market] && Object.keys(registry[market]).sort().map(b => (
+                        <option key={b} value={b}>{b.toUpperCase()}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="input-field-group">
+                    <label className="field-label" htmlFor="model-select">Model</label>
+                    <select id="model-select" className="brand-select" value={formData.model}
+                      onChange={e => setFormData({ ...formData, model: e.target.value })}>
+                      {registry?.[market]?.[formData.brand]?.sort().map((m: string) => (
+                        <option key={m} value={m}>{m.toUpperCase()}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="input-field-group">
+                    <label className="field-label" htmlFor="year-input">Production Year</label>
+                    <input id="year-input" type="number" className="brand-input" value={formData.year}
+                      onChange={e => setFormData({ ...formData, year: Number(e.target.value) })} />
+                  </div>
+
+                  <div className="input-field-group">
+                    <label className="field-label" htmlFor="mileage-input">Odometer (KM)</label>
+                    <input id="mileage-input" type="number" className="brand-input" value={formData.mileage}
+                      onChange={e => setFormData({ ...formData, mileage: Number(e.target.value) })} />
+                  </div>
+                </div>
+
+                <button className="brand-btn" type="submit" disabled={loading} aria-busy={loading}>
+                  {loading ? 'Analyzing Data...' : 'Execute Valuation  +'}
+                </button>
+              </form>
+            </div>
+          </RevealSection>
+
+          {/* ═══ RESULT ═══ */}
           <AnimatePresence mode="wait">
-            {result ? (
-              <motion.article 
-                key="result"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                className="glass-card prediction-card"
-                style={{ marginBottom: '2.5rem' }}
+            {result && (
+              <motion.section
+                className="result-section"
+                id="analysis"
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                aria-live="polite"
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '2rem' }}>
+                <SectionTag label="analysis" />
+                <div className="result-card">
                   <div>
-                    <span className="badge" style={{ background: 'var(--accent)', color: 'white', borderColor: 'transparent' }}>Analysis Complete</span>
-                    <h3 style={{ marginTop: '1.5rem', color: 'var(--text-muted)', fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                      Estimated Market Value
-                    </h3>
-                    <div className="prediction-value luxury-gradient">
-                      <span style={{ fontSize: '0.4em', verticalAlign: 'top', marginRight: '0.3em', position: 'relative', top: '0.5em' }}>
-                        {result.symbol}
-                      </span>
-                      {result.price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    <span className="result-label">Market Equilibrium Value</span>
+                    <div className="result-price">
+                      <span className="result-symbol" aria-hidden="true">{result.symbol}</span>
+                      {result.price.toLocaleString()}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div className="stat-label">Market Segment</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 900, marginTop: '0.5rem' }} className="luxury-gradient">
-                      {result.segment.toUpperCase()}
-                    </div>
+                    <span className="result-label">Classification</span>
+                    <div className="result-segment">{result.segment.toUpperCase()}</div>
                   </div>
                 </div>
-              </motion.article>
-            ) : (
-              <motion.div 
-                key="placeholder"
-                className="glass-card"
-                style={{ marginBottom: '2.5rem', minHeight: '260px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <div style={{ textAlign: 'center', color: 'var(--text-muted)', maxWidth: '400px' }}>
-                  <Sparkles size={48} style={{ opacity: 0.3, marginBottom: '1.5rem', margin: '0 auto' }} />
-                  <p style={{ fontSize: '1.1rem' }}>Enter vehicle parameters to initiate real-time market depreciation analysis.</p>
-                </div>
-              </motion.div>
+              </motion.section>
             )}
           </AnimatePresence>
 
-          <div className="metric-grid">
-            <div className="glass-card stat-card">
-              <div className="stat-value">{(metrics?.regression?.r2 * 100 || 88.0).toFixed(1)}%</div>
-              <div className="stat-label">Model Accuracy</div>
+          {/* ═══ METRICS ═══ */}
+          <RevealSection className="metrics-section" id="metrics">
+            <SectionTag label="metrics" />
+            <div className="metric-grid">
+              <div className="metric-card">
+                <div className="metric-value">
+                  <AnimatedCounter value={metrics?.regression?.r2 * 100 || 86.82} suffix="%" />
+                </div>
+                <div className="metric-label">R² Score</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-value">
+                  $<AnimatedCounter value={metrics?.regression?.mae || 3323} suffix="" decimals={0} />
+                </div>
+                <div className="metric-label">Mean Abs. Error</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-value">
+                  <AnimatedCounter value={metrics?.classification?.accuracy * 100 || 81.7} suffix="%" />
+                </div>
+                <div className="metric-label">Classification Acc.</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-value">
+                  $<AnimatedCounter value={metrics?.regression?.rmse || 6414} suffix="" decimals={0} />
+                </div>
+                <div className="metric-label">RMSE</div>
+              </div>
             </div>
-            <div className="glass-card stat-card">
-              <div className="stat-value">{(metrics?.classification?.accuracy * 100 || 81.4).toFixed(1)}%</div>
-              <div className="stat-label">Market Index</div>
-            </div>
-            <div className="glass-card stat-card">
-              <div className="stat-value">364K</div>
-              <div className="stat-label">Data Nodes</div>
-            </div>
-            <div className="glass-card stat-card">
-              <div className="stat-value">XGB</div>
-              <div className="stat-label">Compute Engine</div>
-            </div>
-          </div>
+          </RevealSection>
 
-          <section className="glass-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2.5rem' }}>
-              <Activity size={24} className="luxury-gradient" />
-              <h2 style={{ fontSize: '1.4rem' }}>Validation Metrics</h2>
+          {/* ═══ CHART ═══ */}
+          <RevealSection className="chart-section" id="validation">
+            <SectionTag label="validation" />
+            <div className="chart-card">
+              <div className="form-header">
+                <Activity size={16} style={{ color: 'var(--accent-blue)' }} aria-hidden="true" />
+                <h3>Validation Matrix</h3>
+              </div>
+              <div style={{ height: '420px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis dataKey="name" stroke="#444" fontSize={9} tickLine={false} axisLine={false}
+                      fontFamily="'Press Start 2P'" />
+                    <YAxis stroke="#444" fontSize={9} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{
+                        background: 'rgba(0,0,0,0.9)', border: '1px solid rgba(255,255,255,0.1)',
+                        color: '#fff', borderRadius: '8px', fontFamily: "'Inter'", fontSize: '0.8rem'
+                      }}
+                    />
+                    <Area type="monotone" dataKey="value" stroke="var(--accent-blue)" strokeWidth={2}
+                      fill="url(#blueGradient)" />
+                    <defs>
+                      <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--accent-blue)" stopOpacity={0.15} />
+                        <stop offset="100%" stopColor="var(--accent-blue)" stopOpacity={0.01} />
+                      </linearGradient>
+                    </defs>
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div className="viz-container">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-                  <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '12px' }}
-                    itemStyle={{ color: '#fff', fontWeight: 600 }}
-                  />
-                  <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-        </div>
+          </RevealSection>
 
-        {/* Full Width Visuals */}
-        <motion.section 
-          className="col-full glass-card"
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.7 }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '3rem' }}>
-            <ShieldCheck size={24} className="luxury-gradient" />
-            <h2 style={{ fontSize: '1.4rem' }}>Neural Audit Trail</h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2.5rem' }}>
-            <article>
-              <h4 className="stat-label" style={{ marginBottom: '1.25rem' }}>Clustering Matrix</h4>
-              <img src="http://localhost:8000/plots/confusion_matrix.png" alt="Confusion Matrix" className="plot-img" />
-            </article>
-            <article>
-              <h4 className="stat-label" style={{ marginBottom: '1.25rem' }}>Error Distribution</h4>
-              <img src="http://localhost:8000/plots/residual_plot.png" alt="Residual Plot" className="plot-img" />
-            </article>
-            <article>
-              <h4 className="stat-label" style={{ marginBottom: '1.25rem' }}>Feature Hierarchy</h4>
-              <img src="http://localhost:8000/plots/feature_importance.png" alt="Feature Importance" className="plot-img" />
-            </article>
-          </div>
-        </motion.section>
+          {/* ═══ AUDIT ═══ */}
+          <RevealSection className="audit-section" id="audit">
+            <SectionTag label="audit" />
+            <div className="form-header">
+              <ShieldCheck size={16} style={{ color: 'var(--accent-blue)' }} aria-hidden="true" />
+              <h3>Neural Audit Trail</h3>
+            </div>
+
+            <div className="audit-grid">
+              <div className="audit-card-featured">
+                <div className="plot-wrapper" style={{ padding: '3rem' }}>
+                  <NeuralHeatmap data={metrics?.chart_data?.confusion} />
+                </div>
+                <div className="audit-overlay">
+                  <div>
+                    <div className="audit-card-label">Fracture 01</div>
+                    <div className="audit-card-sublabel">Clustering Matrix</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="audit-row">
+                <ErrorStability data={metrics?.chart_data?.residuals} metrics={metrics} />
+                <FeatureHierarchy data={metrics?.chart_data?.importance} />
+              </div>
+            </div>
+          </RevealSection>
+        </main>
+
+        {/* ═══ FOOTER ═══ */}
+        <RevealSection id="footer">
+          <footer className="site-footer">
+            <SectionTag label="sovereignty" />
+
+            <h2 className="footer-title">
+              DATA<br /><span className="blue-highlight">SOVEREIGNTY</span>
+            </h2>
+
+            <p className="footer-body">
+              This interface operates as a high-fidelity demonstration of the global car resale intelligence platform.
+              Core engine utilizes XGBoost L2 gradient boosting trained on 364K+ multi-market records.
+              System leverages a validated fallback registry to showcase cascading UI logic and multi-market valuation patterns.
+            </p>
+
+            <div className="footer-divider" />
+
+            <nav className="footer-nav" aria-label="Footer navigation">
+              <button className="footer-nav-item" onClick={() => scrollTo('hero')}>Dashboard</button>
+              <button className="footer-nav-item" onClick={() => scrollTo('variables')}>Variables</button>
+              <button className="footer-nav-item" onClick={() => scrollTo('metrics')}>Metrics</button>
+              <button className="footer-nav-item" onClick={() => scrollTo('audit')}>Audit</button>
+            </nav>
+
+            <div className="footer-brand" aria-hidden="true">
+              RESALE<br />INTELLIGENCE
+            </div>
+
+            <p className="footer-copy">© 2026 // Resale Intelligence // Professional Persona V6.0</p>
+          </footer>
+        </RevealSection>
+
       </div>
 
-      <footer>
-        <div style={{ maxWidth: '800px', margin: '0 auto 4rem auto', padding: '2.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '32px', border: '1px solid var(--border)', backdropFilter: 'blur(10px)' }}>
-          <h4 style={{ color: '#fff', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', fontSize: '1.1rem', letterSpacing: '0.05em' }}>
-            <Database size={20} className="luxury-gradient" /> ARCHITECTURAL NOTE
-          </h4>
-          <p style={{ fontSize: '0.9rem', lineHeight: '1.8', color: 'var(--text-muted)', textAlign: 'center', fontWeight: 500 }}>
-            This interface serves as a high-fidelity demonstration of the Global Car Resale Intelligence platform. 
-            The core engine utilizes an <strong>XGBoost L2 Gradient Boosting</strong> model trained on 364k+ multi-market records. 
-            While the frontend is optimized for web delivery via GitHub Pages, the <strong>Python FastAPI</strong> backend is designed for 
-            high-performance local or containerized deployment. In this public preview, the system leverages a validated 
-            fallback registry to showcase cascading UI logic and multi-market valuation patterns.
-          </p>
+      {/* ─── FLOATING BOTTOM NAV ─── */}
+      <nav className="floating-nav" aria-label="Main navigation">
+        <div className="nav-logo">
+          <Logo size={40} />
         </div>
-        <p style={{ opacity: 0.6 }}>© 2026 Resale Intelligence Systems. Powered by XGBoost Gradient Boosting.</p>
-      </footer>
-    </main>
+        <div className="nav-links">
+          <button className="nav-link" onClick={() => scrollTo('hero')}>Dashboard</button>
+          <button className="nav-link" onClick={() => scrollTo('variables')}>Analysis</button>
+          <button className="nav-link" onClick={() => scrollTo('metrics')}>Metrics</button>
+          <button className="nav-link" onClick={() => scrollTo('audit')}>Audit</button>
+        </div>
+        <button className="nav-cta" onClick={() => scrollTo('variables')}>Predict +</button>
+      </nav>
+    </>
   );
 }
 
